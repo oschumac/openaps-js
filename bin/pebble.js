@@ -49,17 +49,19 @@ if (!module.parent) {
     var currenttemp_input = process.argv.slice(6, 7).pop()
     var isf_input = process.argv.slice(7, 8).pop()
     var requestedtemp_input = process.argv.slice(8, 9).pop()
+    var profile_data_input = process.argv.slice(9, 10).pop()
     
-    if (!glucose_input || !clock_input || !iob_input || !basalprofile_input || !currenttemp_input || !isf_input || !requestedtemp_input) {
-        console.log('usage: ', process.argv.slice(0, 2), '<glucose.json> <clock.json> <iob.json> <current_basal_profile.json> <currenttemp.json> <isf.json> <requestedtemp.json>');
+    if (!glucose_input || !clock_input || !iob_input || !basalprofile_input || !currenttemp_input || !isf_input || !requestedtemp_input || !profile_data_input) {
+        console.log('usage: ', process.argv.slice(0, 2), '<glucose.json> <clock.json> <iob.json> <current_basal_profile.json> <currenttemp.json> <isf.json> <requestedtemp.json> <profile.json>');
         process.exit(1);
     }
     
     var cwd = process.cwd()
+    var profile_data = require(cwd + '/' + profile_data_input);
     var glucose_data = require(cwd + '/' + glucose_input);
     var bgTime;
     if (glucose_data[0].display_time) {
-        bgHHMMSS = glucose_data[0].display_time.split("T")[1];
+        bgHHMMSS = glucose_data[0].display_time.split(" ")[1];
         //bgTime = new Date(glucose_data[0].display_time.replace('T', ' '));
     } else if (glucose_data[0].dateString) {
         bgDate = new Date(glucose_data[0].dateString);
@@ -85,9 +87,9 @@ if (!module.parent) {
     var temp = require(cwd + '/' + currenttemp_input);
     var tempstring;
     if (temp.duration < 1) {
-        tempstring = "No temp basal";
+        tempstring = "Keine TBR";
     } else {
-        tempstring = "Tmp: " + temp.duration + "m@" + temp.rate.toFixed(1);
+        tempstring = "TBR: " + temp.duration + "m@" + temp.rate.toFixed(1);
     }
     var isf_data = require(cwd + '/' + isf_input);
     var isf;
@@ -96,23 +98,26 @@ if (!module.parent) {
     var requestedtemp = require(cwd + '/' + requestedtemp_input);
     var reqtempstring;
     if (typeof requestedtemp.duration === 'undefined') {
-        reqtempstring = "None";
+        reqtempstring = "Keine neue TBR";
     }
     else if (requestedtemp.duration < 1) {
-        reqtempstring = "Cancel";
+        reqtempstring = "Abbruch";
     } else { 
         reqtempstring = requestedtemp.duration + "m@" + requestedtemp.rate.toFixed(1) + "U";
     }
 
+    maxSafeBasal = Math.min(profile_data.max_basal, 3 * profile_data.max_daily_basal, 4 * profile_data.current_basal);
 
     var pebble = {        
-        "content" : "" + bgnow + tick + " " + bgTime + "\n"
-        + iob + "U->" + requestedtemp.eventualBG + "-" + requestedtemp.snoozeBG + "\n"
-        + "Sched: " + basalRate + "U/hr\n"
-        + tempstring
-        + " at " + pumptime + "\n"
-        + "Req: " + reqtempstring + "\n"
-        + requestedtemp.reason,
+        "content" : "BZ:" + bgnow + tick + " " + bgTime + "\n"
+        + "IOB:" + iob + "U->" + requestedtemp.eventualBG + "/" + requestedtemp.snoozeBG + "\n"
+        + tempstring + "\n" 
+        + "Progr: " + basalRate + "U/h\n"
+        + "um " + pumptime + "\n"
+		+ "Req: " + reqtempstring + "\n"
+		+ "BZ avg:" + requestedtemp.bg + "\n"
+        + requestedtemp.reason + "\n"
+		+ "SafeBasal -> " + maxSafeBasal ,
         "refresh_frequency": 1
     };
 
